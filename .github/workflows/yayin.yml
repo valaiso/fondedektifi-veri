@@ -1,0 +1,51 @@
+name: Günlük veri yayını (GitHub Pages)
+
+# Hafta içi 21:30 ve 23:30 TR'de kaynak veriyi okur, etiketleri çevirir ve GitHub Pages'e yayınlar.
+# Kaynak adresi gizli sırdan gelir (KAYNAK_URL); depoda ve kayıtlarda görünmez.
+
+on:
+  schedule:
+    - cron: '30 18 * * 1-5'   # 21:30 TR
+    - cron: '30 20 * * 1-5'   # 23:30 TR (yedek tur)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  derle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Veriyi indir, etiketleri çevir
+        env:
+          PYTHONIOENCODING: utf-8
+          KAYNAK_URL: ${{ secrets.KAYNAK_URL }}
+          KAYNAK_MARKA: ${{ secrets.KAYNAK_MARKA }}
+        run: python scripts/build.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  yayinla:
+    needs: derle
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
